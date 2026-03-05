@@ -1,6 +1,9 @@
-# API Documentation Generator
+---
+name: api-gen
+description: Analyzes Spring MVC RestControllers to automatically generate OpenAPI specs and HTML documentation.
+---
 
-Analyzes Spring MVC RestControllers to automatically generate OpenAPI specs and HTML documentation.
+# API Documentation Generator
 
 ## Trigger
 

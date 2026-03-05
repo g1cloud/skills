@@ -1,6 +1,9 @@
-# Semantic Commit
+---
+name: semantic-commit
+description: Create a git commit using the Conventional Commits specification (v1.0.0).
+---
 
-Create a git commit using the Conventional Commits specification (v1.0.0).
+# Semantic Commit
 
 ## Trigger
 
