@@ -1,0 +1,1665 @@
+openapi: 3.0.3
+info:
+  title: Bluework Tool OpenAPI
+  description: |
+    Bluework Tool 프로젝트의 외부 공개 OpenAPI 명세입니다.
+
+    모든 엔드포인트는 API Key 인증이 필요합니다.
+    - `Authorization: Bearer <api-key>` 헤더
+    - 또는 `?apiKey=<api-key>` 쿼리 파라미터
+
+    API Key는 '설정' 메뉴에서 입력할 수 있습니다.
+
+    ## 응답 포맷
+
+    모든 200 응답은 두 가지 포맷을 지원합니다.
+    - `application/json` (기본값)
+    - `text/toon` — [Token-Oriented Object Notation](https://github.com/toon-format/spec).
+      JSON과 동일한 데이터 모델을 LLM 토큰 효율적으로 표현하는 포맷.
+
+    포맷은 다음 우선순위로 결정됩니다.
+    1. `?format=toon|json` 쿼리 파라미터
+    2. `Accept: text/toon` 요청 헤더
+    3. 기본값 JSON
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3000
+    description: 로컬 개발 서버
+
+security:
+  - BearerAuth: []
+  - ApiKeyQuery: []
+
+tags:
+  - name: UI
+    description: 화면(UI) 목록 조회
+  - name: Message
+    description: 다국어 메시지 조회 / 추가 / 수정 / 삭제
+  - name: BizModule
+    description: 비즈니스 모듈 목록 및 엔터티 조회
+  - name: EntityModel
+    description: 엔터티 모델 텍스트 조회
+  - name: UiModel
+    description: UI 모델 텍스트 조회
+  - name: SystemCode
+    description: 시스템 공통 코드(GroupCode) 조회 / 추가 / 수정 / 삭제
+
+paths:
+  /openapi/{projectId}/ui:
+    get:
+      tags: [UI]
+      operationId: listUi
+      summary: 화면(UI) 목록 조회
+      description: |
+        프로젝트의 화면 목록을 조회합니다. `use: true`인 화면만 반환합니다.
+        `uiId`, `uiName`, `uiType` 파라미터는 대소문자 구분 없는 LIKE 검색을 수행합니다.
+        `menu1`, `menu2` 파라미터는 페이지네이션이 적용된 결과 내에서 메뉴명 기준으로 필터링합니다.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - name: uiId
+          in: query
+          description: uiId LIKE 검색 (대소문자 무시)
+          schema: { type: string }
+        - name: uiName
+          in: query
+          description: 화면명(name.ko) LIKE 검색 (대소문자 무시)
+          schema: { type: string }
+        - name: uiType
+          in: query
+          description: uiType LIKE 검색 (대소문자 무시)
+          schema: { type: string }
+        - name: menu1
+          in: query
+          description: 1차 메뉴명 LIKE 검색 (페이지네이션 후 필터링)
+          schema: { type: string }
+        - name: menu2
+          in: query
+          description: 2차 메뉴명 LIKE 검색 (페이지네이션 후 필터링)
+          schema: { type: string }
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Format'
+      responses:
+        '200':
+          description: 화면 목록
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenApiUiListResponse'
+            text/toon:
+              schema:
+                $ref: '#/components/schemas/ToonResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /openapi/{projectId}/message:
+    get:
+      tags: [Message]
+      operationId: listMessage
+      summary: 메시지 원본 목록 조회
+      description: |
+        Message 컬렉션 데이터를 반환합니다. properties 엔드포인트와 동일한 필터를
+        지원하지만 `locale` 변환은 수행하지 않습니다.
+
+        `msg` 객체는 TOON 테이블 압축이 가능하도록 `msg_<locale>` 형태로 평탄화되어
+        반환됩니다 (예: `msg_ko`, `msg_en`, `msg_ja`). 응답 페이지에 등장한 모든
+        locale 은 모든 item 에 동일한 키 집합으로 포함되며 값이 없으면 `null`입니다.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - name: owner
+          in: query
+          description: 소유 애플리케이션 종류 필터
+          schema:
+            type: string
+            enum: [BackendApp, FrontendApp]
+        - name: appId
+          in: query
+          description: FrontendApp용 appId 필터
+          schema: { type: string }
+        - name: use
+          in: query
+          description: 사용 여부 필터 (기본값 true)
+          schema:
+            type: string
+            enum: ['true', 'false']
+            default: 'true'
+        - name: export
+          in: query
+          description: export 여부 필터 (기본값 true)
+          schema:
+            type: string
+            enum: ['true', 'false']
+            default: 'true'
+        - name: prefix
+          in: query
+          description: msgKey prefix 필터 (예시 `ecp.`)
+          schema: { type: string }
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Format'
+      responses:
+        '200':
+          description: 메시지 원본 목록
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenApiMessageListResponse'
+            text/toon:
+              schema:
+                $ref: '#/components/schemas/ToonResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Message]
+      operationId: createMessage
+      summary: 메시지 추가
+      description: |
+        새 메시지를 추가합니다.
+
+        - `msgKey`, `msg`(언어별 메시지 맵) 는 필수입니다.
+        - `owner`/`appId`/`use`/`export`/`updateId` 는 선택입니다. 미지정 시
+          owner=null, appId=null, use=true, export=true, updateId='openapi' 가 적용됩니다.
+        - 동일한 `msgKey` 가 이미 존재하면 409 Conflict 입니다.
+        - `msg` 의 빈 문자열 값은 저장 시점에서 제거되어 응답 GET 결과와 일관됩니다.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/Format'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenApiMessageCreateRequest'
+      responses:
+        '200':
+          description: 추가 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenApiWriteAck'
+            text/toon:
+              schema:
+                $ref: '#/components/schemas/ToonResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /openapi/{projectId}/message/{msgKey}:
+    put:
+      tags: [Message]
+      operationId: updateMessage
+      summary: 메시지 수정
+      description: |
+        지정한 `msgKey` 의 `msg`(언어별 메시지 맵) 를 갱신합니다.
+        매칭되는 메시지가 없으면 404 입니다.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - name: msgKey
+          in: path
+          required: true
+          description: 메시지 키
+          schema: { type: string }
+        - $ref: '#/components/parameters/Format'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenApiMessageUpdateRequest'
+      responses:
+        '200':
+          description: 수정 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenApiWriteAck'
+            text/toon:
+              schema:
+                $ref: '#/components/schemas/ToonResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Message]
+      operationId: deleteMessage
+      summary: 메시지 삭제
+      description: 지정한 `msgKey` 의 메시지를 삭제합니다. 매칭이 없으면 404.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - name: msgKey
+          in: path
+          required: true
+          description: 메시지 키
+          schema: { type: string }
+        - $ref: '#/components/parameters/Format'
+      responses:
+        '200':
+          description: 삭제 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenApiWriteAck'
+            text/toon:
+              schema:
+                $ref: '#/components/schemas/ToonResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /openapi/{projectId}/message/properties:
+    get:
+      tags: [Message]
+      operationId: getMessageProperties
+      summary: 메시지 properties 조회
+      description: |
+        Message 컬렉션 데이터를 Java properties 파일 형식 텍스트로 변환하여 반환합니다.
+
+        - `locale`이 단일 값(예: `ko`)이면 `SingleLocaleResponse`를 반환합니다.
+        - `locale`이 쉼표로 구분된 복수 값(예: `ko,en,ja`)이면 `MultiLocaleResponse`를 반환합니다.
+
+        지원 로케일: `ko`, `en`, `ja`, `zh`, `fr`
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - name: locale
+          in: query
+          required: true
+          description: '언어 코드. 쉼표로 구분하여 복수 지정 가능 (예: `ko`, `ko,en,ja`)'
+          schema:
+            type: string
+            example: ko,en
+        - name: owner
+          in: query
+          description: 소유 애플리케이션 종류 필터
+          schema:
+            type: string
+            enum: [BackendApp, FrontendApp]
+        - name: appId
+          in: query
+          description: FrontendApp용 appId 필터
+          schema: { type: string }
+        - name: use
+          in: query
+          description: 사용 여부 필터 (기본값 true)
+          schema:
+            type: string
+            enum: ['true', 'false']
+            default: 'true'
+        - name: export
+          in: query
+          description: export 여부 필터 (기본값 true)
+          schema:
+            type: string
+            enum: ['true', 'false']
+            default: 'true'
+        - name: prefix
+          in: query
+          description: msgKey prefix 필터 (예시 `ecp.`)
+          schema: { type: string }
+        - $ref: '#/components/parameters/Format'
+      responses:
+        '200':
+          description: 메시지 properties 텍스트
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/SingleLocaleResponse'
+                  - $ref: '#/components/schemas/MultiLocaleResponse'
+            text/toon:
+              schema:
+                $ref: '#/components/schemas/ToonResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /openapi/{projectId}/systemCode:
+    get:
+      tags: [SystemCode]
+      operationId: listSystemCode
+      summary: 시스템 공통 코드(GroupCode) 목록 조회
+      description: |
+        프로젝트의 GroupCode(시스템 공통 코드) 목록을 반환합니다.
+
+        - `groupCodeNameMap`/`groupCodeDescMap` 은 객체 형태로 반환되며,
+          값이 비어 있는(빈 문자열/null) 언어 키는 응답에서 생략됩니다.
+        - `codeList[].codeNameMap`/`codeDescMap` 은 TOON 테이블 압축이 가능하도록
+          `codeName_<locale>`/`codeDesc_<locale>` 형태로 평탄화되어 반환됩니다.
+          응답 페이지에 등장한 모든 locale 은 모든 entry 에 동일한 키 집합으로
+          포함되며 값이 없으면 `null` 입니다.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - name: groupCode
+          in: query
+          description: groupCode 정확 일치 필터 (예시 `PointSavingType`)
+          schema: { type: string }
+        - name: use
+          in: query
+          description: 사용 여부 필터 (기본값 true)
+          schema:
+            type: string
+            enum: ['true', 'false']
+            default: 'true'
+        - name: export
+          in: query
+          description: export 여부 필터 (기본값 true)
+          schema:
+            type: string
+            enum: ['true', 'false']
+            default: 'true'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Format'
+      responses:
+        '200':
+          description: 시스템 공통 코드 목록
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenApiSystemCodeListResponse'
+            text/toon:
+              schema:
+                $ref: '#/components/schemas/ToonResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [SystemCode]
+      operationId: createSystemCode
+      summary: GroupCode 추가
+      description: |
+        새 GroupCode(시스템 공통 코드) 를 추가합니다.
+
+        - `groupCode` 는 필수입니다.
+        - `groupCodeNameMap`, `groupCodeDescMap` 는 선택. 미지정 시 빈 객체로 저장됩니다.
+        - `codeList` 는 선택. 각 항목은 `code` 가 필수이며 `color` 는 미지정 시 null 로 저장됩니다.
+        - 동일 `groupCode` 가 이미 존재하면 409 Conflict 입니다.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/Format'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenApiSystemCodeCreateRequest'
+      responses:
+        '200':
+          description: 추가 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenApiWriteAck'
+            text/toon:
+              schema:
+                $ref: '#/components/schemas/ToonResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /openapi/{projectId}/systemCode/{groupCode}:
+    put:
+      tags: [SystemCode]
+      operationId: updateSystemCode
+      summary: GroupCode 수정
+      description: |
+        지정한 `groupCode` 의 `groupCodeNameMap` 을 갱신합니다.
+        매칭이 없으면 404 입니다.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - name: groupCode
+          in: path
+          required: true
+          description: GroupCode 식별자
+          schema: { type: string }
+        - $ref: '#/components/parameters/Format'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenApiSystemCodeUpdateRequest'
+      responses:
+        '200':
+          description: 수정 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenApiWriteAck'
+            text/toon:
+              schema:
+                $ref: '#/components/schemas/ToonResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /openapi/{projectId}/systemCode/{groupCode}/code:
+    post:
+      tags: [SystemCode]
+      operationId: addSystemCodeEntry
+      summary: GroupCode 에 Code 추가
+      description: |
+        지정한 GroupCode 의 `codeList` 에 새 Code 항목을 삽입합니다.
+
+        - `code` 는 필수입니다.
+        - `order` 가 주어지면 해당 인덱스 위치에 삽입, 미지정/범위 밖이면 끝에 append.
+        - 동일 `code` 가 이미 있으면 409, GroupCode 자체가 없으면 404.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - name: groupCode
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/Format'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenApiCodeAddRequest'
+      responses:
+        '200':
+          description: 추가 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenApiWriteAck'
+            text/toon:
+              schema:
+                $ref: '#/components/schemas/ToonResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /openapi/{projectId}/systemCode/{groupCode}/code/{code}:
+    put:
+      tags: [SystemCode]
+      operationId: updateSystemCodeEntry
+      summary: GroupCode 의 Code 수정
+      description: |
+        GroupCode 의 특정 Code 항목 정보를 부분 갱신합니다.
+        `codeNameMap`, `codeDescMap`, `color` 중 1개 이상이 필요합니다.
+        GroupCode 또는 Code 가 없으면 404.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - name: groupCode
+          in: path
+          required: true
+          schema: { type: string }
+        - name: code
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/Format'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenApiCodeUpdateRequest'
+      responses:
+        '200':
+          description: 수정 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenApiWriteAck'
+            text/toon:
+              schema:
+                $ref: '#/components/schemas/ToonResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [SystemCode]
+      operationId: deleteSystemCodeEntry
+      summary: GroupCode 의 Code 삭제
+      description: |
+        GroupCode 의 `codeList` 에서 지정 `code` 항목을 삭제합니다.
+        GroupCode 또는 Code 가 없으면 404.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - name: groupCode
+          in: path
+          required: true
+          schema: { type: string }
+        - name: code
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/Format'
+      responses:
+        '200':
+          description: 삭제 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenApiWriteAck'
+            text/toon:
+              schema:
+                $ref: '#/components/schemas/ToonResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /openapi/{projectId}/bizModule:
+    get:
+      tags: [BizModule]
+      operationId: listBizModule
+      summary: 비즈니스 모듈 목록 조회
+      description: |
+        프로젝트의 비즈니스 모듈 목록을 조회합니다.
+        `moduleId`, `moduleName` 파라미터는 대소문자 구분 없는 LIKE 검색을 수행합니다.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - name: moduleId
+          in: query
+          description: moduleId LIKE 검색 (대소문자 무시)
+          schema: { type: string }
+        - name: moduleName
+          in: query
+          description: moduleName LIKE 검색 (대소문자 무시)
+          schema: { type: string }
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Format'
+      responses:
+        '200':
+          description: 비즈니스 모듈 목록
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenApiBizModuleListResponse'
+            text/toon:
+              schema:
+                $ref: '#/components/schemas/ToonResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /openapi/{projectId}/bizModule/{id}/entities:
+    get:
+      tags: [BizModule]
+      operationId: listBizModuleEntities
+      summary: 비즈니스 모듈의 엔터티 목록 조회
+      description: |
+        지정한 비즈니스 모듈에 속한 Entity Diagram의 모든 엔터티를 평탄화하여 반환합니다.
+        검색 파라미터는 정규식(`i` 플래그) 기반 부분 일치를 수행합니다.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/BizModuleId'
+        - name: entityName
+          in: query
+          description: 엔터티명 검색 (정규식, 대소문자 무시)
+          schema: { type: string }
+        - name: logicalName
+          in: query
+          description: 논리명 검색 (정규식, 대소문자 무시)
+          schema: { type: string }
+        - name: physicalName
+          in: query
+          description: 물리명 검색 (정규식, 대소문자 무시)
+          schema: { type: string }
+        - $ref: '#/components/parameters/Format'
+      responses:
+        '200':
+          description: 엔터티 목록
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenApiEntityListResponse'
+            text/toon:
+              schema:
+                $ref: '#/components/schemas/ToonResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [BizModule]
+      operationId: createEntity
+      summary: 엔터티 추가
+      description: |
+        지정한 비즈니스 모듈의 Entity Diagram 에 새 엔터티를 추가합니다.
+
+        - `name`(논리명/클래스명), `dbAttrs.physicalName`(테이블 물리명) 은 필수입니다.
+        - `groupName` 미지정 시 다이어그램 루트의 `entities[]` (그룹 없음) 에 추가됩니다.
+        - `groupName` 지정 시 해당 `packageName` 의 EntityGroup 에 추가, 그룹이 없으면 404.
+        - `name` 또는 `physicalName` 이 다이어그램 내 어딘가에 이미 있으면 409.
+        - `columns[]` 는 단순화된 컬럼 입력으로, 내부적으로 attribute+dbAttribute 쌍으로 저장됩니다.
+        - 본 엔드포인트는 attributes 풀 구조, indexes, associations, jpaAttrs 등은 받지 않으며 모두 기본값으로 채워집니다.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/BizModuleId'
+        - $ref: '#/components/parameters/Format'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenApiEntityCreateRequest'
+      responses:
+        '200':
+          description: 추가 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenApiEntityWriteAck'
+            text/toon:
+              schema:
+                $ref: '#/components/schemas/ToonResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /openapi/{projectId}/bizModule/{id}/entities/{entityName}/attributes:
+    post:
+      tags: [BizModule]
+      operationId: createEntityAttribute
+      summary: 엔터티에 속성 추가
+      description: |
+        지정한 엔터티(`entityName`) 의 `attributes` 배열에 새 속성을 추가합니다.
+        엔터티는 다이어그램 루트 `entities[]` 와 모든 그룹 `entities[]` 에서
+        `entity.name === entityName` 으로 검색합니다.
+
+        - `name`(속성명, camelCase), `physicalName`(DB 컬럼명) 필수.
+        - `order` 미지정 시 기존 attributes 의 max(order) + 1 자동 부여.
+        - 같은 엔터티 내 `name` 또는 `physicalName` 중복 시 409.
+        - 엔터티 미존재 시 404.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/BizModuleId'
+        - name: entityName
+          in: path
+          required: true
+          description: 대상 엔터티의 논리명(클래스명, `entity.name`)
+          schema: { type: string }
+        - $ref: '#/components/parameters/Format'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenApiAttributeAddRequest'
+      responses:
+        '200':
+          description: 추가 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenApiAttributeWriteAck'
+            text/toon:
+              schema:
+                $ref: '#/components/schemas/ToonResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /openapi/{projectId}/bizModule/{id}/entities/{entityName}/attributes/{attributeName}:
+    delete:
+      tags: [BizModule]
+      operationId: deleteEntityAttribute
+      summary: 엔터티 속성 삭제
+      description: |
+        지정한 엔터티의 attributes 배열에서 `attributeName` 인 항목을 제거합니다.
+
+        - 같은 엔터티 인덱스가 해당 속성의 dbAttribute 를 참조하면 409 로 차단합니다.
+          응답 메시지에 차단 원인 인덱스 이름이 포함되며, 해당 인덱스를 먼저 정리해야 합니다.
+        - 엔터티 또는 속성 미존재 시 404.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/BizModuleId'
+        - name: entityName
+          in: path
+          required: true
+          schema: { type: string }
+        - name: attributeName
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/Format'
+      responses:
+        '200':
+          description: 삭제 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenApiAttributeWriteAck'
+            text/toon:
+              schema:
+                $ref: '#/components/schemas/ToonResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /openapi/{projectId}/entityModel/{id}/text:
+    get:
+      tags: [EntityModel]
+      operationId: getEntityModelText
+      summary: 엔터티 모델 텍스트 조회
+      description: |
+        지정한 비즈니스 모듈의 Entity Diagram을 텍스트 형식으로 변환하여 반환합니다.
+        `entity`, `table`, `package` 파라미터는 단일 값 또는 배열로 지정할 수 있습니다.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/BizModuleId'
+        - name: entity
+          in: query
+          description: 엔터티명 필터 (단일 또는 배열)
+          schema:
+            oneOf:
+              - type: string
+              - type: array
+                items: { type: string }
+        - name: table
+          in: query
+          description: 테이블명 필터 (단일 또는 배열)
+          schema:
+            oneOf:
+              - type: string
+              - type: array
+                items: { type: string }
+        - name: package
+          in: query
+          description: 패키지명 필터 (단일 또는 배열)
+          schema:
+            oneOf:
+              - type: string
+              - type: array
+                items: { type: string }
+        - $ref: '#/components/parameters/Format'
+      responses:
+        '200':
+          description: 엔터티 모델 텍스트
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TextResponse'
+            text/toon:
+              schema:
+                $ref: '#/components/schemas/ToonResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: 조건에 맞는 Entity가 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /openapi/{projectId}/entityModel/{id}/entities/{names}:
+    get:
+      tags: [EntityModel]
+      operationId: getEntityModelEntities
+      summary: 다중 엔터티 원본 정보 조회
+      description: |
+        지정한 비즈니스 모듈의 Entity Diagram 에서 `names` 로 지정한 엔터티들을
+        원본 객체 형태(JSON)로 한 번에 반환합니다.
+        각 이름은 `entity.name` 또는 `entity.dbAttrs.physicalName`(테이블명) 양쪽으로
+        매칭하며, 매칭되지 않은 이름은 응답의 `missing` 배열에 담깁니다.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/BizModuleId'
+        - name: names
+          in: path
+          required: true
+          description: 콤마 구분된 엔터티명 또는 테이블명 (예 `SalesOrder,Checkout` 또는 `sls_order,sls_checkout`)
+          schema: { type: string }
+        - $ref: '#/components/parameters/Format'
+      responses:
+        '200':
+          description: 매칭된 Entity 원본 객체 목록
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenApiEntityModelEntitiesResponse'
+            text/toon:
+              schema:
+                $ref: '#/components/schemas/ToonResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: 비즈니스 모듈 또는 Entity Diagram을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /openapi/{projectId}/uiModel/{id}/text:
+    get:
+      tags: [UiModel]
+      operationId: getUiModelText
+      summary: UI 모델 텍스트 조회
+      description: 지정한 화면(UI)의 모델을 텍스트 형식으로 변환하여 반환합니다.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - name: id
+          in: path
+          required: true
+          description: UI ID (MongoDB _id)
+          schema: { type: string }
+        - $ref: '#/components/parameters/Format'
+      responses:
+        '200':
+          description: UI 모델 텍스트
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TextResponse'
+            text/toon:
+              schema:
+                $ref: '#/components/schemas/ToonResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /openapi/{projectId}/uiModel/{id}/partModel:
+    get:
+      tags: [UiModel]
+      operationId: getUiModelPartModel
+      summary: UI 모델 PartModel 구조 조회
+      description: |
+        지정한 화면(UI)의 PartModel 트리 구조를 화면 정보와 함께 반환합니다.
+        텍스트 변환 없이 원시 트리 구조를 그대로 받을 때 사용합니다.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - name: id
+          in: path
+          required: true
+          description: UI ID (MongoDB _id 또는 uiId)
+          schema: { type: string }
+        - $ref: '#/components/parameters/Format'
+      responses:
+        '200':
+          description: UI 모델 PartModel 구조
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenApiUiModelPartModelResponse'
+            text/toon:
+              schema:
+                $ref: '#/components/schemas/ToonResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: UiModel을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        `Authorization: Bearer <api-key>` 형식으로 전송하는 API Key.
+    ApiKeyQuery:
+      type: apiKey
+      in: query
+      name: apiKey
+      description: 쿼리 파라미터로 전달하는 API Key.
+
+  parameters:
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      description: 프로젝트 ID (DB 이름과 동일)
+      schema: { type: string }
+    BizModuleId:
+      name: id
+      in: path
+      required: true
+      description: 비즈니스 모듈 ID (MongoDB _id)
+      schema: { type: string }
+    Offset:
+      name: offset
+      in: query
+      description: 페이지네이션 offset
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    Limit:
+      name: limit
+      in: query
+      description: 페이지네이션 limit
+      schema:
+        type: integer
+        minimum: 1
+        default: 100
+    Sort:
+      name: sort
+      in: query
+      description: |
+        정렬 필드 (쉼표 구분). `-` 접두어는 내림차순.
+        예: `updateDate,-uiId`
+      schema: { type: string }
+    Format:
+      name: format
+      in: query
+      description: |
+        응답 포맷 (지정하지 않으면 `Accept` 헤더 또는 기본값 `json`을 따릅니다).
+      schema:
+        type: string
+        enum: [json, toon]
+
+  responses:
+    BadRequest:
+      description: 잘못된 요청 (필수 파라미터 누락 등)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: API Key 누락 또는 유효하지 않음
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: 대상 리소스를 찾을 수 없음
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: 중복된 키로 인해 추가할 수 없음
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+        message:
+          type: string
+      required: [statusCode, message]
+
+    TextResponse:
+      type: object
+      properties:
+        text:
+          type: string
+      required: [text]
+
+    ToonResponse:
+      type: string
+      description: |
+        `text/toon`로 인코딩된 응답 본문.
+        해당 엔드포인트의 `application/json` 스키마와 동일한 데이터 모델을
+        TOON(Token-Oriented Object Notation) 텍스트로 표현합니다.
+      example: |
+        items[2]{id,name}:
+          1,Alice
+          2,Bob
+        totalCount: 2
+
+    OpenApiUiListItem:
+      type: object
+      properties:
+        uiId: { type: string }
+        uiName: { type: string, description: '화면 이름 (한국어)' }
+        uiType: { type: string }
+        menu1:
+          type: string
+          nullable: true
+          description: 1차 메뉴명 (한국어)
+        menu2:
+          type: string
+          nullable: true
+          description: 2차 메뉴명 (한국어)
+        updateId: { type: string }
+        updateDate: { type: string }
+      required: [uiId, uiName, uiType, menu1, menu2, updateId, updateDate]
+
+    OpenApiUiListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpenApiUiListItem'
+        totalCount:
+          type: integer
+          description: 전체 개수 (menu1/menu2 필터 적용 시 필터링된 개수)
+        offset: { type: integer }
+        limit: { type: integer }
+      required: [items, totalCount, offset, limit]
+
+    OpenApiBizModuleListItem:
+      type: object
+      properties:
+        moduleId: { type: string }
+        moduleName: { type: string }
+        updateId: { type: string }
+        updateDate: { type: string }
+      required: [moduleId, moduleName, updateId, updateDate]
+
+    OpenApiBizModuleListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpenApiBizModuleListItem'
+        totalCount: { type: integer }
+        offset: { type: integer }
+        limit: { type: integer }
+      required: [items, totalCount, offset, limit]
+
+    OpenApiEntityListItem:
+      type: object
+      properties:
+        entityName: { type: string }
+        logicalName: { type: string, description: '논리명 (한국어)' }
+        physicalName: { type: string, description: '물리명 (DB 컬럼/테이블 이름)' }
+      required: [entityName, logicalName, physicalName]
+
+    OpenApiEntityListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpenApiEntityListItem'
+        totalCount: { type: integer }
+      required: [items, totalCount]
+
+    OpenApiMessageItem:
+      type: object
+      description: |
+        메시지 원본 항목. `msg_<locale>` 필드는 응답 페이지에 등장한 locale에 따라
+        동적으로 추가됩니다 (예: `msg_ko`, `msg_en`, `msg_ja`).
+      properties:
+        msgKey: { type: string }
+        owner:
+          type: string
+          nullable: true
+        appId:
+          type: string
+          nullable: true
+        use: { type: boolean }
+        export: { type: boolean }
+        updateId:
+          type: string
+          nullable: true
+        updateDate:
+          type: string
+          nullable: true
+      additionalProperties:
+        type: string
+        nullable: true
+        description: 'msg_<locale> 형태의 다국어 메시지 값'
+      required: [msgKey, owner, appId, use, export, updateId, updateDate]
+
+    OpenApiMessageListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpenApiMessageItem'
+        totalCount: { type: integer }
+        offset: { type: integer }
+        limit: { type: integer }
+      required: [items, totalCount, offset, limit]
+
+    OpenApiMultiLangString:
+      type: object
+      description: |
+        다국어 문자열 맵. 키는 언어 코드(`ko`, `en`, `ja`, `zh`, `fr`, `th` 등),
+        값은 해당 언어의 문자열입니다. 값이 비어 있는(빈 문자열/null) 언어 키는
+        응답에서 생략됩니다.
+      additionalProperties:
+        type: string
+
+    OpenApiSystemCodeEntry:
+      type: object
+      description: |
+        GroupCode 의 하위 코드 항목. `codeName_<locale>`/`codeDesc_<locale>` 필드는
+        응답 페이지에 등장한 locale에 따라 동적으로 추가됩니다.
+      properties:
+        code: { type: string }
+        color:
+          type: string
+          nullable: true
+          description: 코드 색상 (지정되지 않은 경우 null)
+      additionalProperties:
+        type: string
+        nullable: true
+        description: 'codeName_<locale> / codeDesc_<locale> 형태의 다국어 값'
+      required: [code, color]
+
+    OpenApiSystemCodeItem:
+      type: object
+      description: GroupCode 항목.
+      properties:
+        groupCode: { type: string }
+        use: { type: boolean }
+        export: { type: boolean }
+        updateId:
+          type: string
+          nullable: true
+        updateDate:
+          type: string
+          nullable: true
+        groupCodeNameMap:
+          $ref: '#/components/schemas/OpenApiMultiLangString'
+        groupCodeDescMap:
+          $ref: '#/components/schemas/OpenApiMultiLangString'
+        codeList:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpenApiSystemCodeEntry'
+      required:
+        - groupCode
+        - use
+        - export
+        - updateId
+        - updateDate
+        - groupCodeNameMap
+        - groupCodeDescMap
+        - codeList
+
+    OpenApiSystemCodeListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpenApiSystemCodeItem'
+        totalCount: { type: integer }
+        offset: { type: integer }
+        limit: { type: integer }
+      required: [items, totalCount, offset, limit]
+
+    SingleLocaleResponse:
+      type: object
+      description: locale을 단일 값으로 지정한 경우의 응답
+      properties:
+        text:
+          type: string
+          description: properties 파일 내용
+        filename:
+          type: string
+          description: 권장 파일명 (예 `messages_ko.properties`)
+        totalCount:
+          type: integer
+      required: [text, filename, totalCount]
+
+    MultiLocaleResponse:
+      type: object
+      description: locale을 복수 값으로 지정한 경우의 응답
+      properties:
+        files:
+          type: object
+          description: locale을 키로 한 파일 텍스트 맵
+          additionalProperties:
+            type: object
+            properties:
+              text: { type: string }
+              count: { type: integer }
+            required: [text, count]
+        totalCount:
+          type: integer
+          description: locale별 메시지 개수의 최대값
+      required: [files, totalCount]
+
+    OpenApiUiModelMenuInfo:
+      type: object
+      properties:
+        id: { type: string, description: 'menuId' }
+        name: { type: string, description: '메뉴명 (한국어)' }
+      required: [id, name]
+
+    OpenApiUiModelInfo:
+      type: object
+      description: 화면 정보 헤더
+      properties:
+        uiId: { type: string }
+        name: { type: string, description: '화면 이름 (한국어)' }
+        menu1:
+          allOf:
+            - $ref: '#/components/schemas/OpenApiUiModelMenuInfo'
+          nullable: true
+          description: 1차 메뉴 정보
+        menu2:
+          allOf:
+            - $ref: '#/components/schemas/OpenApiUiModelMenuInfo'
+          nullable: true
+          description: 2차 메뉴 정보
+
+    OpenApiUiModelAttrValue:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [S, I, B, M, M_REF, DS, DS_REF, DM, DM_REF, ETC]
+          description: |
+            속성 값 타입.
+            - `S`: 문자열, `I`: 정수, `B`: 불리언, `M`: 메시지
+            - `DS`: DataSource, `DM`: DataMapping
+            - `*_REF`: 참조 인덱스 (변환 후에는 노출되지 않음)
+        val:
+          type: string
+          description: 속성 값(문자열로 표현)
+      required: [type, val]
+
+    OpenApiUiModelCaseMessage:
+      type: object
+      description: 케이스 메시지 (msgText 외 추가 필드 허용)
+      properties:
+        msgText: { type: string }
+      required: [msgText]
+      additionalProperties: true
+
+    OpenApiUiModelPartModel:
+      type: object
+      description: 계층 구조의 PartModel 노드
+      properties:
+        partId: { type: string }
+        partType: { type: string }
+        partInfo:
+          type: object
+          additionalProperties: true
+        attrMap:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/OpenApiUiModelAttrValue'
+        comment:
+          type: object
+          additionalProperties: { type: string }
+        caseMsgList:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpenApiUiModelCaseMessage'
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpenApiUiModelPartModel'
+        layoutAttrMap:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/OpenApiUiModelAttrValue'
+        extraAttrMap:
+          type: object
+          additionalProperties: { type: string }
+      required: [partId]
+
+    OpenApiUiModelPartModelResponse:
+      type: object
+      properties:
+        uiInfo:
+          $ref: '#/components/schemas/OpenApiUiModelInfo'
+        partModel:
+          $ref: '#/components/schemas/OpenApiUiModelPartModel'
+      required: [uiInfo, partModel]
+
+    OpenApiEntityModelEntitiesResponse:
+      type: object
+      required: [items, missing, totalCount]
+      properties:
+        items:
+          type: array
+          description: 매칭된 Entity 의 원본 객체 배열
+          items:
+            type: object
+            additionalProperties: true
+        missing:
+          type: array
+          description: 요청 중 매칭되지 않은 이름 목록
+          items: { type: string }
+        totalCount:
+          type: integer
+          description: items 의 길이
+
+    OpenApiWriteAck:
+      type: object
+      description: |
+        쓰기 작업(추가/수정/삭제)의 단순 응답 객체. 변경된 키 정보가 함께 포함됩니다.
+      properties:
+        ok: { type: boolean }
+        msgKey:
+          type: string
+          description: 메시지 변경 작업에서 반환되는 키
+        groupCode:
+          type: string
+          description: GroupCode 변경 작업에서 반환되는 키
+        code:
+          type: string
+          description: Code 변경 작업에서 반환되는 키
+      required: [ok]
+
+    OpenApiMessageCreateRequest:
+      type: object
+      description: 메시지 추가 요청 본문
+      properties:
+        msgKey: { type: string }
+        msg:
+          allOf:
+            - $ref: '#/components/schemas/OpenApiMultiLangString'
+          description: 언어별 메시지 맵 (빈 문자열 값은 저장 시 제거됨)
+        owner:
+          type: string
+          nullable: true
+          description: BackendApp 또는 FrontendApp (미지정 시 null)
+        appId:
+          type: string
+          nullable: true
+        use: { type: boolean, default: true }
+        export: { type: boolean, default: true }
+        updateId:
+          type: string
+          description: 감사 필드. 미지정 시 'openapi'.
+      required: [msgKey, msg]
+
+    OpenApiMessageUpdateRequest:
+      type: object
+      description: 메시지 수정 요청 본문 (`msg` 만 갱신)
+      properties:
+        msg:
+          allOf:
+            - $ref: '#/components/schemas/OpenApiMultiLangString'
+          description: 새로운 언어별 메시지 맵
+        updateId:
+          type: string
+          description: 감사 필드. 미지정 시 'openapi'.
+      required: [msg]
+
+    OpenApiSystemCodeWriteEntry:
+      type: object
+      description: 쓰기 요청에서 사용하는 Code 항목
+      properties:
+        code: { type: string }
+        codeNameMap:
+          $ref: '#/components/schemas/OpenApiMultiLangString'
+        codeDescMap:
+          $ref: '#/components/schemas/OpenApiMultiLangString'
+        color:
+          type: string
+          nullable: true
+          description: 코드 색상 (미지정/빈 문자열은 null 로 저장)
+      required: [code]
+
+    OpenApiSystemCodeCreateRequest:
+      type: object
+      description: GroupCode 추가 요청 본문
+      properties:
+        groupCode: { type: string }
+        groupCodeNameMap:
+          $ref: '#/components/schemas/OpenApiMultiLangString'
+        groupCodeDescMap:
+          $ref: '#/components/schemas/OpenApiMultiLangString'
+        codeList:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpenApiSystemCodeWriteEntry'
+        use: { type: boolean, default: true }
+        export: { type: boolean, default: true }
+        updateId:
+          type: string
+          description: 감사 필드. 미지정 시 'openapi'.
+      required: [groupCode]
+
+    OpenApiSystemCodeUpdateRequest:
+      type: object
+      description: GroupCode 수정 요청 본문 (`groupCodeNameMap` 만 갱신)
+      properties:
+        groupCodeNameMap:
+          $ref: '#/components/schemas/OpenApiMultiLangString'
+        updateId:
+          type: string
+          description: 감사 필드. 미지정 시 'openapi'.
+      required: [groupCodeNameMap]
+
+    OpenApiCodeAddRequest:
+      type: object
+      description: GroupCode 에 Code 항목을 추가하는 요청 본문
+      properties:
+        code: { type: string }
+        codeNameMap:
+          $ref: '#/components/schemas/OpenApiMultiLangString'
+        codeDescMap:
+          $ref: '#/components/schemas/OpenApiMultiLangString'
+        color:
+          type: string
+          nullable: true
+          description: 코드 색상 (미지정/빈 문자열은 null 로 저장)
+        order:
+          type: integer
+          minimum: 0
+          description: 삽입 위치 인덱스. 미지정/범위 밖이면 끝에 append.
+        updateId:
+          type: string
+          description: 감사 필드. 미지정 시 'openapi'.
+      required: [code]
+
+    OpenApiCodeUpdateRequest:
+      type: object
+      description: |
+        GroupCode 의 특정 Code 항목 부분 수정 요청 본문.
+        `codeNameMap`, `codeDescMap`, `color` 중 1개 이상이 필요합니다.
+      properties:
+        codeNameMap:
+          $ref: '#/components/schemas/OpenApiMultiLangString'
+        codeDescMap:
+          $ref: '#/components/schemas/OpenApiMultiLangString'
+        color:
+          type: string
+          nullable: true
+          description: 코드 색상 (미지정/빈 문자열은 null 로 저장)
+        updateId:
+          type: string
+          description: 감사 필드. 미지정 시 'openapi'.
+
+    OpenApiEntityColumnInput:
+      type: object
+      description: |
+        엔터티 추가 시 사용하는 단순화된 컬럼 입력. 내부적으로 attribute + dbAttribute(1개)
+        쌍으로 변환되어 저장됩니다. `attrType` 은 항상 `'NORMAL'` 로 고정,
+        `modelId`/`order`/`parent` 등 내부 메타는 자동 생성됩니다.
+      properties:
+        name:
+          type: string
+          description: 속성 이름 (camelCase)
+        physicalName:
+          type: string
+          description: DB 컬럼명
+        logicalName:
+          $ref: '#/components/schemas/OpenApiMultiLangString'
+        description:
+          $ref: '#/components/schemas/OpenApiMultiLangString'
+        type:
+          type: string
+          default: String
+          description: 논리 타입 (Java 타입 등). 미지정 시 'String'.
+        dataType:
+          type: string
+          default: VARCHAR
+          description: DB 데이터타입. 미지정 시 'VARCHAR'.
+        length:
+          type: integer
+          description: 컬럼 길이 (선택)
+        identifier:
+          type: boolean
+          default: false
+          description: PK 여부
+        notNull:
+          type: boolean
+          default: false
+        unique:
+          type: boolean
+          default: false
+        autoIncrement:
+          type: boolean
+          default: false
+        updatable:
+          type: boolean
+          default: true
+        attributeGroup:
+          type: string
+          description: |
+            속성 그룹 (선택). 일반적으로 사용되는 값: `sn`(일련번호), `id`(식별자),
+            `code`(코드), `amt`(금액), `no`(번호), `datetime`(날짜시간), `val`(값)
+      required: [name, physicalName]
+
+    OpenApiEntityCreateRequest:
+      type: object
+      description: 엔터티 추가 요청 본문
+      properties:
+        groupName:
+          type: string
+          description: |
+            추가 대상 EntityGroup 의 `packageName`. 미지정 시 다이어그램 루트
+            `entities[]` (그룹 없음) 으로 추가됩니다. 지정했는데 해당 그룹이
+            없으면 404.
+        name:
+          type: string
+          description: 엔터티 논리명(클래스명)
+        dbAttrs:
+          type: object
+          description: 엔터티(테이블) 식별 정보
+          properties:
+            physicalName:
+              type: string
+              description: 테이블 물리명
+            logicalName:
+              $ref: '#/components/schemas/OpenApiMultiLangString'
+          required: [physicalName]
+        description:
+          $ref: '#/components/schemas/OpenApiMultiLangString'
+        stereotype:
+          type: string
+          enum: [JPA_ENTITY, JPA_EMBEDDABLE]
+          default: JPA_ENTITY
+          description: |
+            엔터티 종류. `JPA_ENTITY`(기본) 는 일반 영속 엔터티, `JPA_EMBEDDABLE` 은
+            값 타입(임베드 가능). 미지정 시 `JPA_ENTITY`.
+        hasPersonalInfo:
+          type: boolean
+          default: false
+        abstractClass:
+          type: boolean
+          default: false
+        useMultiLangEntity:
+          type: boolean
+          default: false
+        columns:
+          type: array
+          description: 단순화된 컬럼 목록 (선택)
+          items:
+            $ref: '#/components/schemas/OpenApiEntityColumnInput'
+        updateId:
+          type: string
+          description: 감사 필드. 미지정 시 'openapi'.
+      required: [name, dbAttrs]
+
+    OpenApiEntityWriteAck:
+      type: object
+      description: 엔터티 쓰기 응답
+      properties:
+        ok:
+          type: boolean
+        name:
+          type: string
+          description: 추가된 엔터티의 논리명
+        physicalName:
+          type: string
+          description: 추가된 엔터티의 테이블 물리명
+        modelId:
+          type: string
+          description: 자동 생성된 엔터티 modelId(UUID). 인덱스/관계 추가 시 참조에 사용.
+      required: [ok, name, physicalName, modelId]
+
+    OpenApiAttributeAddRequest:
+      description: |
+        엔터티 속성 추가 요청 본문. `OpenApiEntityColumnInput` 의 모든 필드 +
+        `order`(선택), `updateId`(선택).
+      allOf:
+        - $ref: '#/components/schemas/OpenApiEntityColumnInput'
+        - type: object
+          properties:
+            order:
+              type: integer
+              description: |
+                attributes 배열에 부여할 `order` 값.
+                미지정 시 기존 attributes 의 `max(order) + 1`.
+            updateId:
+              type: string
+              description: 감사 필드. 미지정 시 'openapi'.
+
+    OpenApiAttributeWriteAck:
+      type: object
+      description: 엔터티 속성 쓰기 응답 (POST 추가, DELETE 삭제 공용)
+      properties:
+        ok:
+          type: boolean
+        entityName:
+          type: string
+        attributeName:
+          type: string
+        physicalName:
+          type: string
+          description: POST(추가) 응답에만 포함됨
+        modelId:
+          type: string
+          description: POST(추가) 응답에만 포함되는 새 attribute 의 UUID
+      required: [ok, entityName, attributeName]
