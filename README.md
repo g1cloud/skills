@@ -73,3 +73,62 @@ Bluework Tool 의 OpenAPI(`/openapi/{projectId}/...`)를 `curl` 로 호출합니
 ```
 
 > Nuxt `baseURL: '/tool/'` 가 적용된 환경에서는 `/openapi/...` 호출이 302 redirect 됩니다. 스킬의 모든 curl 예시는 `-L` 옵션을 포함합니다.
+
+## Statusline
+
+### etc/statusline.sh
+
+Claude Code 의 HUD(상태표시줄)에 사용할 수 있는 statusline 스크립트입니다. [oh-my-claudecode](https://github.com/Yeachan-Heo/oh-my-claudecode) HUD 디자인에서 영감을 받았습니다.
+
+**표시 항목:**
+
+```
+Model | 5h:NN%(Hh Mm) | wk:NN%(Dd Hh) | ctx:NN% | cwd | repo:NAME | branch:BR | +S !M ?U ⇡A ⇣B
+```
+
+- **Model**: 사용 중인 모델(Opus/Sonnet/Haiku)과 버전 (티어별 색상)
+- **5h / wk**: 5시간 / 주간 rate limit 사용률과 리셋까지 남은 시간 (70%/90% 임계값으로 색상)
+- **ctx**: 컨텍스트 윈도우 사용률 (70%/85% 임계값, 85% 이상 시 CRITICAL 표시)
+- **cwd**: 현재 작업 디렉토리 (basename)
+- **branch**: 현재 git 브랜치 (worktree 인 경우 `(wt:NAME)` 표시)
+- **상태 카운트**: `+`staged `!`modified `?`untracked `⇡`ahead `⇣`behind
+
+**요구사항:** `jq`, `bash`, `git`
+
+**적용 방법 (간편):**
+
+Claude Code 에 파일 URL 을 주고 적용해달라고 하면 됩니다.
+
+```
+https://raw.githubusercontent.com/g1cloud/skills/refs/heads/main/etc/statusline.sh 를 claude code 의 statusline 으로 적용해줘
+```
+
+또는 슬래시 커맨드로:
+
+```
+/statusline https://raw.githubusercontent.com/g1cloud/skills/refs/heads/main/etc/statusline.sh 를 적용해줘
+```
+
+**적용 방법 (수동):**
+
+1. 스크립트를 다운로드하고 실행 권한을 부여합니다.
+
+   ```sh
+   mkdir -p ~/.claude
+   curl -fsSL https://raw.githubusercontent.com/g1cloud/skills/refs/heads/main/etc/statusline.sh -o ~/.claude/statusline.sh
+   chmod +x ~/.claude/statusline.sh
+   ```
+
+2. `~/.claude/settings.json` (또는 프로젝트의 `.claude/settings.json`) 에 statusLine 을 등록합니다.
+
+   ```json
+   {
+     "statusLine": {
+       "type": "command",
+       "command": "~/.claude/statusline.sh",
+       "padding": 0
+     }
+   }
+   ```
+
+3. Claude Code 를 재시작하면 하단에 HUD 가 표시됩니다.
