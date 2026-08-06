@@ -2,13 +2,25 @@
 
 ## Install
 
+저장소를 받아서 원하는 스킬 디렉토리를 `.claude/skills/` 로 복사합니다.
+
 ```sh
-npx skills add g1cloud/skills --skill api-gen
+# 1. 저장소를 임시 디렉토리에 클론
+git clone --depth 1 https://github.com/g1cloud/skills.git /tmp/g1cloud-skills
 
-npx skills add g1cloud/skills --skill semantic-commit
+# 2. 원하는 스킬을 복사
+#    - 전역 설치: ~/.claude/skills/
+#    - 프로젝트 설치: <프로젝트 루트>/.claude/skills/
+mkdir -p ~/.claude/skills
+cp -r /tmp/g1cloud-skills/skills/api-gen ~/.claude/skills/
 
-npx skills add g1cloud/skills --skill bluework-openapi
+# 3. 임시 디렉토리 정리
+rm -rf /tmp/g1cloud-skills
 ```
+
+설치 가능한 스킬: `api-gen`, `semantic-commit`, `bluework-openapi`, `blue-reno-release`
+
+이미 설치한 스킬을 업데이트할 때도 같은 방식으로 덮어쓰면 됩니다. 복사 후 Claude Code 를 재시작하면 스킬이 로드됩니다.
 
 ## Skills
 
@@ -73,6 +85,51 @@ Bluework Tool 의 OpenAPI(`/openapi/{projectId}/...`)를 `curl` 로 호출합니
 ```
 
 > Nuxt `baseURL: '/tool/'` 가 적용된 환경에서는 `/openapi/...` 호출이 302 redirect 됩니다. 스킬의 모든 curl 예시는 `-L` 옵션을 포함합니다.
+
+### blue-reno-release
+
+Blue Reno 릴리즈 노트 플랫폼의 Open API(`/api/v1`)로 릴리즈 노트를 등록·수정·게시합니다. 같은 버전의 노트가 있으면 수정하고 없으면 생성한 뒤 `published` 로 전환합니다. 본문을 직접 주지 않으면 직전 태그 이후의 git 로그에서 초안을 만들어 확인을 받은 뒤 올립니다.
+
+**트리거 키워드:** `릴리즈 노트`, `release note`, `bluereno`, `blue reno`, `릴리즈 노트 게시`, `퍼블리시`
+
+**요구사항:** `python3`
+
+**환경 변수:**
+
+| 변수 | 설명 | 필수 | 기본값 |
+|---|---|---|---|
+| `BLUERENO_API_KEY` | API 키 (`brn_...`) | ✅ | — |
+| `BLUERENO_URL` | 서버 오리진 | — | `https://bluereno.g1project.net` |
+| `BLUERENO_ARTIFACT_ID` | 게시 대상 Artifact id | — | — |
+
+API 키는 커밋되지 않는 `.claude/settings.local.json` 에 넣습니다.
+
+```json
+{
+  "env": {
+    "BLUERENO_API_KEY": "brn_xxx..."
+  }
+}
+```
+
+나머지는 프로젝트 루트의 `.claude/settings.json` 에 설정합니다.
+
+```json
+{
+  "env": {
+    "BLUERENO_URL": "https://bluereno.g1project.net",
+    "BLUERENO_ARTIFACT_ID": "6"
+  }
+}
+```
+
+API 키는 Blue Reno 로그인 후 좌측 하단 프로필 메뉴 → "API 키" 에서 발급하며, 평문은 발급 직후 한 번만 보입니다. 설정 후 Claude Code 를 재시작해야 `env` 가 주입됩니다. 키 소유자가 대상 Artifact 에 **Editor 이상** 권한이어야 합니다.
+
+Artifact id 를 모를 때는 접근 가능한 목록을 조회할 수 있습니다.
+
+```sh
+python3 .claude/skills/blue-reno-release/scripts/blue_reno_publish.py --list-artifacts
+```
 
 ## Statusline
 
